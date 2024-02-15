@@ -1,0 +1,101 @@
+---
+title: "GDP Dataset EDA"
+author: "NJH"
+date: "2022-08-22"
+output: html_document
+---
+
+## GDP Dataset에 대해 EDA를 해보겠습니다.
+
+#### 데이터셋의 출처는 kaggle의 [GDP By Country 1999-2022](https://www.kaggle.com/datasets/8757713012649a716785c053ca256fbc0e098ada79e31c3d5066d87d97682c71)입니다.
+
+### 분석 환경 준비
+
+```{r, message=F, warning=F}
+rm(list=ls())
+setwd("E:/others/R/NJH/GDP")
+
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+library(gganimate)
+library(janitor)
+library(gifski)
+```
+
+### 데이터 구조
+
+##### Dataset Definition
+
+1999년부터 2022년까지의 180개 국가의 GDP 데이터셋입니다.
+
+```{r}
+raw <- read.csv("GDP by Country 1999-2022.csv",header = T)
+str(raw)
+```
+
+연도 앞에 x가 붙어있고, 2011년이 누락되어 있는 점을 확인했습니다.  
+gdp 값이 chr로 들어있는 것을 확인했습니다.  
+
+### EDA (Exploratory Data Analysis)
+
+분석에 용이하도록 long data로 변환합니다.
+
+```{r}
+gdp_long <- gather(raw, year, gdp, X1999:X2022)
+gdp_long %>% head(10)
+```
+
+gdp 값이 chr이기 때문에 ,를 먼저 제거한 후에 수치형으로 변환합니다.  
+연도 데이터에 X를 제거해줍니다.  
+
+```{r}
+gdp_long$gdp <- str_replace_all(gdp_long$gdp, ",", "")
+gdp_long$gdp <- as.numeric(gdp_long$gdp)
+gdp_long$year <- str_replace_all(gdp_long$year, "X", "")
+
+str(gdp_long)
+head(gdp_long)
+```
+
+gdp 값은 numeric으로 잘 변형되었고, year는 숫자만 남았음을 확인합니다.  
+
+### Korea GDP  
+
+```{r}
+K_gdp <- gdp_long %>% filter(Country=="Korea")
+
+ggplot(data = K_gdp, aes(x=as.integer(year), y=gdp)) + 
+  geom_point() + geom_line(col="red") + 
+  labs(title ="Korea GDP", x="연도",y="GDP")
+```
+
+### GDP Top 10%  
+
+총 180개 국가이기 때문에 10%인 18개 국가만 선발하여 그래프를 그려보았습니다. 
+
+```{r}
+gdp_top <- gdp_long %>% group_by(year) %>% 
+  mutate(rank = rank(-gdp)) %>%       
+  group_by(Country) %>% filter(rank <= 18) %>% ungroup() 
+
+gdp_plot <- ggplot(data = gdp_top, aes(x=gdp, y=reorder(Country,gdp), 
+                                       fill = Country)) + 
+  geom_col() + 
+  theme(legend.position = "none") + 
+  labs(title="GDP Top 10%", x="GDP", y="Country")
+
+gdp_plot
+```
+
+추가로 *Racing Bar Chart*를 만들어보았습니다.  
+
+```{r}
+anim_gdp <- gdp_plot + 
+  transition_states(year, transition_length = 3, state_length = 1)
+
+anim_gdp
+```
+
+### End.
